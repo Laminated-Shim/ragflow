@@ -8,10 +8,6 @@ services:
         condition: service_healthy
     image: ${RAGFLOW_IMAGE}
     container_name: ragflow-server
-    ports:
-      - ${SVR_HTTP_PORT}:9380
-      - 80:80
-      - 443:443
     volumes:
       - ./ragflow-logs:/ragflow/logs
       - ./nginx/ragflow.conf:/etc/nginx/conf.d/ragflow.conf
@@ -24,6 +20,19 @@ services:
       - MACOS=${MACOS}
     networks:
       - ragflow
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ragflow.rule=Host(`kb.laminatedshim.local`) && PathPrefix(`/ragflow`)"
+      - "traefik.http.routers.ragflow.entrypoints=web"
+      - "traefik.http.middlewares.ragflow-strip.stripprefix.prefixes=/ragflow"
+      - "traefik.http.routers.ragflow.middlewares=ragflow-strip@docker"
+      - "traefik.http.services.ragflow.loadbalancer.server.port=${SVR_HTTP_PORT}"
+      # HTTPS
+      - "traefik.http.routers.ragflow-secure.rule=Host(`kb.laminatedshim.local`) && PathPrefix(`/ragflow`)"
+      - "traefik.http.routers.ragflow-secure.entrypoints=websecure"
+      - "traefik.http.routers.ragflow-secure.tls=true"
+      - "traefik.http.routers.ragflow-secure.middlewares=ragflow-strip@docker"
     restart: on-failure
     # https://docs.docker.com/engine/daemon/prometheus/#create-a-prometheus-configuration
     # If you're using Docker Desktop, the --add-host flag is optional. This flag makes sure that the host's internal IP gets exposed to the Prometheus container.
@@ -51,3 +60,8 @@ services:
   #   # If you're using Docker Desktop, the --add-host flag is optional. This flag makes sure that the host's internal IP gets exposed to the Prometheus container.
   #   extra_hosts:
   #     - "host.docker.internal:host-gateway"
+
+
+networks:
+  traefik-network:
+    external: true
